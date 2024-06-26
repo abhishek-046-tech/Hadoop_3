@@ -1,0 +1,336 @@
+# Connect To the DataCenter with Public Key or Private in case of windows through Putty.
+
+ssh -i Downloads/file.pem ubuntu@public_dns_address
+
+# Update the system
+sudo apt-get update && sudo apt-get dist-upgrade -y
+
+# Copy public key on to the DataCenter main server
+scp -i multi.pem multi.pem ubuntu@public_dns:~/.ssh
+# output => scp -i accessme.pem accessme.pem ubuntu@34.201.125.83:~/.ssh
+                # Warning: Permanently added '34.201.125.83' (ED25519) to the list of known hosts.
+                # accessme.pem                                                                                               100% 1674     5.5KB/s   00:00
+                                              
+
+# Create a Hadoop user for accessing HDFS
+sudo addgroup hadoop &&
+sudo adduser hduser --ingroup hadoop && 
+sudo adduser hduser sudo &&
+sudo su hduser
+
+# Create local key
+ssh-keygen
+cat id_ed25519.pub >> authorized_keys
+OR
+cat id_rsa.pub >> authorized_keys
+
+# Copy the instance public key (multi.pem) to hduser's directory
+sudo su
+cp /home/ubuntu/.ssh/multi.pem /home/hduser/.ssh/
+chown hduser:hadoop /home/hduser/.ssh/multi.pem
+exit
+
+# Install Java 8 (Open-JDK)
+sudo apt install openjdk-8-jdk openjdk-8-jre -y
+# enter default
+java -version
+
+
+# Download and Install Hadoop
+# xzvf => extract from archive
+
+wget https://dlcdn.apache.org/hadoop/common/stable/hadoop-3.4.0.tar.gz
+tar -xzvf hadoop-3.4.0.tar.gz
+sudo mv hadoop-3.4.0 /usr/local/hadoop 
+sudo chown -R hduser:hadoop /usr/local/hadoop
+
+# Set Enviornment Variable
+readlink -f $(which java)
+nano ~/.bashrc
+
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export HADOOP_HOME=/usr/local/hadoop
+export PATH=$PATH:$HADOOP_HOME/bin
+export PATH=$PATH:$HADOOP_HOME/sbin
+export PATH=$PATH:/usr/local/hadoop/bin/
+export HADOOP_MAPRED_HOME=$HADOOP_HOME
+export HADOOP_COMMON_HOME=$HADOOP_HOME
+export HADOOP_HDFS_HOME=$HADOOP_HOME
+export YARN_HOME=$HADOOP_HOME
+export HADOOP_CONF_DIR=/usr/local/hadoop/etc/hadoop
+
+source ~/.bashrc
+
+cd /usr/local/hadoop/etc/hadoop/
+
+#Update hadoop-env.sh
+nano hadoop-env.sh
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export HADOOP_LOG_DIR=/var/log/hadoop
+sudo mkdir /var/log/hadoop/
+sudo chown -R hduser:hadoop /var/log/hadoop
+
+#Disable FireWall iptables
+# anywhere u can fire
+sudo iptables -L -n
+sudo ufw status
+sudo ufw disable
+# Firewall stopped and disabled on system startup
+
+
+#Disabling Transparent Hugepage Compaction
+
+cat /sys/kernel/mm/transparent_hugepage/defrag
+# You get => always defer defer+madvise [madvise] never
+# cd
+# making the directory
+$ sudo nano /etc/init.d/disable-transparent-hugepages
+
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          disable-transparent-hugepages
+# Required-Start:    $local_fs
+# Required-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Disable Linux transparent huge pages
+# Description:       Disable Linux transparent huge pages, to improve
+#                    database performance.
+### END INIT INFO
+
+case $1 in
+  start)
+    if [ -d /sys/kernel/mm/transparent_hugepage ]; then
+      thp_path=/sys/kernel/mm/transparent_hugepage
+    elif [ -d /sys/kernel/mm/redhat_transparent_hugepage ]; then
+      thp_path=/sys/kernel/mm/redhat_transparent_hugepage
+    else
+      return 0
+    fi
+
+    echo 'never' > ${thp_path}/enabled
+    echo 'never' > ${thp_path}/defrag
+
+    unset thp_path
+    ;;
+esac
+
+# Paste until here
+# default permission is 644 change it
+$ sudo chmod 755 /etc/init.d/disable-transparent-hugepages
+
+$ sudo update-rc.d disable-transparent-hugepages defaults
+
+# Reboot Instance 
+# >>Restart server 
+# Go to su hduser
+# test
+# cat /sys/kernel/mm/transparent_hugepage/defrag
+
+# Set Swappiness (Kernal configuration => when the swap space getting started)
+# sysctl => kernanl configuration
+sudo sysctl -a | grep vm.swappiness
+# You get => vm.swappiness = 60
+# change it recommended 1-10 best is 1
+sudo sysctl vm.swappiness=1
+# You get => vm.swappiness = 1
+
+# Configure NTP 
+timedatectl status
+timedatectl list-timezones
+# Set timezone to Asia Kolkata
+sudo timedatectl set-timezone Asia/Kolkata
+sudo apt install ntp -y
+
+##Configure SSH Password less logins
+# fire both below lines
+sudo su -c touch /home/hduser/.ssh/config; echo "Host *\n StrictHostKeyChecking no\n
+UserKnownHostsFile=/dev/null" > /home/hduser/.ssh/config
+# You get "su: user /home/hduser/.ssh/config does not exist or the user entry does not contain all the required fields" but now file is created check
+
+sudo service ssh restart
+
+# Configure .profile (make sure you are on NN) 600 permission
+ nano .profile
+ eval `ssh-agent` ssh-add /home/hduser/.ssh/<Your Keyname>.pem
+
+#  You get => Agent pid 1995
+            # Identity added: /home/hduser/.ssh/access.pem (/home/hduser/.ssh/access.pem)
+
+ source .profile
+#  ==========================================================
+# Prerequisite end's here Interview perspective Why/How we doing
+# ============================================================
+
+----------****** Create a snapshot at this point/Create AMI with no reboot ******----------------- ( Takes time wait )
+# Create 4 nodes from this image
+# keypair same
+# SG same
+# Name all EC-2 like below respectively
+# nn
+# rm
+# 1dn
+# 2dn
+# 3dn
+
+# in user Ubuntu
+#sudo nano /etc/hosts and include these lines:FQDN
+# private IP Private DNS Hostname
+
+54.210.9.196 ip-172-31-89-1.ec2.internal nn
+52.207.251.237 ip-172-31-19-37.ec2.internal rm
+3.95.215.212 ip-172-31-24-140.ec2.internal 1dn
+18.207.154.21 ip-172-31-18-31.ec2.internal 2dn
+3.80.44.106 ip-172-31-19-82.ec2.internal 3d
+
+
+Do this for all nodes 
+#sudo nano /etc/hosts
+# fire ssh <servername>
+
+# back on hduser
+
+
+# Install and Configure dsh (Used for firing same cmd on multiple server)
+sudo apt install dsh -y
+sudo nano /etc/dsh/machines.list
+#localhost (comment it)
+nn
+rm
+1dn
+2dn
+3dn
+dsh -a uptime
+dsh -a source .profile
+
+
+# for managing keys we install Agent
+
+# Go under
+cd /usr/local/hadoop/etc/hadoop
+
+# Configure masters and slaves
+nano masters
+# localhost
+rm
+
+nano workers
+# localhost
+1dn
+2dn
+3dn
+
+
+
+#Update core-site.xml
+nano core-site.xml
+<property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://nn:9000</value>
+  </property>
+
+#Update hdfs-site.xml on name node 
+# By default HDFS has 3 copies for retrive
+# Make directory namenode on namenode
+
+mkdir -p /usr/local/hadoop/data/hdfs/namenode
+nano hdfs-site.xml
+<property>
+    <name>dfs.replication</name>
+    <value>3</value>
+  </property>
+  <property>
+    <name>dfs.namenode.name.dir</name>
+    <value>file:///usr/local/hadoop/data/hdfs/namenode</value>
+  </property>
+   <property>
+    <name>dfs.datanode.data.dir</name>
+    <value>file:///usr/local/hadoop/data/hdfs/datanode</value>
+  </property> 
+
+
+#Create proper directories on datanode's
+dsh -m 1dn,2dn,3dn mkdir -p /usr/local/hadoop/data/hdfs/datanode
+ 
+
+
+#Update yarn-site.xml
+nano yarn-site.xml
+<property>
+    <name>yarn.nodemanager.aux-services</name>
+    <value>mapreduce_shuffle</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.hostname</name>
+    <value>rm</value>
+  </property>
+<property>
+        <name>yarn.nodemanager.env-whitelist</name>
+        <value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_MAPRED_HOME</value>
+  </property>
+
+
+#Update mapred-site.xml
+
+nano mapred-site.xml
+<property>
+    <name>mapreduce.jobtracker.address</name>
+    <value>rm:54311</value>
+  </property>
+  <property>
+    <name>mapreduce.framework.name</name>
+    <value>yarn</value>
+  </property>
+<property>
+  <name>yarn.app.mapreduce.am.env</name>
+  <value>HADOOP_MAPRED_HOME=$HADOOP_MAPRED_HOME</value>
+</property>
+<property>
+  <name>mapreduce.map.env</name>
+  <value>HADOOP_MAPRED_HOME=$HADOOP_MAPRED_HOME</value>
+</property>
+<property>
+  <name>mapreduce.reduce.env</name>
+  <value>HADOOP_MAPRED_HOME=$HADOOP_MAPRED_HOME</value>
+</property>
+
+# update ownership
+sudo chown -R hduser:hadoop $HADOOP_HOME
+
+#SCP all the files (Send all config files to other server)
+cd /usr/local/hadoop/etc/hadoop
+# For all nodes
+scp core-site.xml hdfs-site.xml mapred-site.xml yarn-site.xml workers rm:/usr/local/hadoop/etc/hadoop
+scp core-site.xml hdfs-site.xml mapred-site.xml yarn-site.xml workers 1dn:/usr/local/hadoop/etc/hadoop
+scp core-site.xml hdfs-site.xml mapred-site.xml yarn-site.xml workers 2dn:/usr/local/hadoop/etc/hadoop
+scp core-site.xml hdfs-site.xml mapred-site.xml yarn-site.xml workers 3dn:/usr/local/hadoop/etc/hadoop
+
+
+
+#Format Namenode
+# format only on main node
+hdfs namenode -format
+
+
+# Start the cluster from ssh nn
+start-dfs.sh
+
+# Go to start yarn fron ssh rm(If mistakenly fore on wrong fire $stop-yarn.sh)
+start-yarn.sh
+
+# Back to ssh nn
+dsh -a jps
+
+# Amking directory and putting data
+hdfs dfs -mkdir /user
+hdfs dfs -mkdir /user/ubuntu
+hdfs dfs -put hadoop-3.3.4o apt .tar.gz /user/ubuntu
+hdfs dfs -ls 
+hdfs dfs -ls -R
+
+# Go to browser publicIP:nn(port no-9870)
+# Go to browser publicIP:rm(port no-8088)
+
+# Run sample yarn job
+yarn jar /usr/local/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-examples-*.jar pi  5 10
+
