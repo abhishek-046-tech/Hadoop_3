@@ -1,0 +1,167 @@
+#####################################################
+		Hadoop 3 Single Node
+#####################################################
+
+# Step1 Launch EC-Instance t2.medium 
+
+# Install Java
+sudo apt-get update
+sudo apt install openjdk-8-jdk openjdk-8-jre -y
+sudo apt update
+sudo apt install openjdk-8-jdk openjdk-8-jre -y
+
+java -version (Check version)
+
+#Create a Hadoop user for accessing HDFS and MapReduce
+sudo addgroup hadoop
+sudo adduser hduser --ingroup hadoop 
+sudo adduser hduser sudo
+sudo su hduser
+cd
+
+#Configure SSH
+ssh localhost
+ssh-keygen
+click enter 3 times for no password
+cd .ssh
+cat id_ed25519.pub >> authorized_keys
+# cat id_ed25519.rsa >> authorized_keys For test check according
+ssh localhost
+exit
+
+
+#Download Hadoop
+# You get from www.hadoop.apache.org link hadoop 3.4.0 912 MB
+wget https://dlcdn.apache.org/hadoop/common/stable/hadoop-3.4.0.tar.gz
+
+#Extract and Install Hadoop tar ball
+ls
+tar -xzvf hadoop-3.4.0.tar.gz
+sudo mv hadoop-3.4.0 /usr/local/hadoop
+sudo chown -R hduser:hadoop /usr/local/hadoop
+
+# Set Enviornment Variable
+readlink -f $(which java)
+nano ~/.bashrc
+# paste at the end
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export HADOOP_HOME=/usr/local/hadoop
+export PATH=$PATH:$HADOOP_HOME/bin
+export PATH=$PATH:$HADOOP_HOME/sbin
+export PATH=$PATH:/usr/local/hadoop/bin/
+export HADOOP_MAPRED_HOME=$HADOOP_HOME
+export HADOOP_COMMON_HOME=$HADOOP_HOME
+export HADOOP_HDFS_HOME=$HADOOP_HOME
+export YARN_HOME=$HADOOP_HOME
+export HADOOP_CONF_DIR=/usr/local/hadoop/etc/hadoop
+# ========================================
+# refresh cmd source
+source ~/.bashrc
+echo $PATH
+
+
+
+#Update hadoop-env.sh
+
+cd /usr/local/hadoop/etc/hadoop/
+ls
+nano hadoop-env.sh
+export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+export HADOOP_LOG_DIR=/var/log/hadoop
+sudo mkdir /var/log/hadoop
+sudo chown hduser:hadoop -R /var/log/hadoop
+
+#Update core-site.xml
+# put code under 
+# <configuration>here</configuration>
+nano core-site.xml
+ <property>
+  <name>fs.defaultFS</name>
+  <value>hdfs://localhost:54310</value>
+</property>
+
+
+
+#Update hdfs-site.xml
+sudo mkdir -p /usr/local/hadoop_store/hdfs/namenode
+sudo mkdir -p /usr/local/hadoop_store/hdfs/datanode
+sudo chown -R hduser:hadoop /usr/local/hadoop_store
+nano hdfs-site.xml
+<property> 
+<name>dfs.replication</name>
+  <value>1</value>
+ </property>
+ <property>
+   <name>dfs.namenode.name.dir</name>
+   <value>file:/usr/local/hadoop_store/hdfs/namenode</value>
+ </property>
+ <property>
+   <name>dfs.datanode.data.dir</name>
+   <value>file:/usr/local/hadoop_store/hdfs/datanode</value>
+ </property>
+
+
+#Update yarn-site.xml
+nano yarn-site.xml
+<property>
+      <name>yarn.nodemanager.aux-services</name>
+      <value>mapreduce_shuffle</value>
+   </property>
+<property>
+        <name>yarn.nodemanager.env-whitelist</name>
+        <value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_MAPRED_HOME</value>
+  </property>
+
+
+
+#Update mapred-site.xml
+# put code under 
+# <configuration>here</configuration>
+nano mapred-site.xml
+<property>
+  <name>mapreduce.jobtracker.address</name>
+  <value>localhost:54311</value>
+   </property>
+<property>
+   <name>mapreduce.framework.name</name>
+   <value>yarn</value>
+ </property>
+<property>
+  <name>yarn.app.mapreduce.am.env</name>
+  <value>HADOOP_MAPRED_HOME=$HADOOP_MAPRED_HOME</value>
+</property>
+<property>
+  <name>mapreduce.map.env</name>
+  <value>HADOOP_MAPRED_HOME=$HADOOP_MAPRED_HOME</value>
+</property>
+<property>
+  <name>mapreduce.reduce.env</name>
+  <value>HADOOP_MAPRED_HOME=$HADOOP_MAPRED_HOME</value>
+</property>
+
+
+
+#Format Namenode because it's new storage
+cd
+hdfs namenode -format
+
+# start cluster
+start-dfs.sh
+start-yarn.sh
+
+# cmd shows demon's of java
+jps
+
+
+
+hdfs dfs -mkdir /user
+hdfs dfs -mkdir /user/hduser
+hdfs dfs -put hadoop-3.4.0.tar.gz /user/hduser
+
+yarn jar /usr/local/hadoop/share/hadoop/mapreduce/hadoop-*examples*.jar pi 5 10
+
+# paste EC2 public IP UI reflects and check tar file in utilities
+
+WebUI
+NN:9870
+
