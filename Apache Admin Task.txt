@@ -1,0 +1,139 @@
+      *********************************
+              Apache Admin Task
+       *******************************
+
+
+ ---------*****S3 data transfer ******------------
+
+ cd /usr/local/hadoop/etc/hadoop
+   Go key credential copy and paste
+
+   nano core-site.xml
+
+   <property>
+   <name>fs.s3a.access.key</name>
+   <description>AWS access key ID used by S3A file system.</description>
+   <value>keyid press here</value>
+   </property>
+
+   <property>
+   <name>fs.s3.secret.key</name>
+   <description>AWS secret key used by S3A file system.</description>
+   <value>paste secret acces key</value>
+   </propety>
+
+
+   nano hadoop-env.sh
+
+   export HADOOP_CLASSPATH=$HADOOP_CLASSPATH:$HADOOP_/share/hadoop/tools/lib/*
+
+   cd
+
+    **********Copy from S3 to HDFS*****
+
+   hadoop dfs -cp s3a://<bucket-name>/<file-name> hdfs:///user/hduser/
+
+   hdfs dfs -cp s3a://<bucket-name>/<file-name> user/hduser 
+
+
+  ----------***Hadoop Archival****--------
+  hadoop archive -archiveName my.har -p /user/ubuntu abcd hadoop-3.4.0.tar.gz /user/ubuntu
+
+  hdfs dfs -ls
+
+  hdfs dfs -ls -R my.har 
+
+  hdfs dfs -ls har:///user/ubuntu/my.har
+
+  hdfs dfs -mkdir /user/ubuntu/unarch
+
+  hdfs dfs -cp har:///user/ubuntu/my.har/abcd hdfs:/user/ubuntu/unarch
+
+  hdfs dfs -ls -R /user/ubuntu/unarch
+
+
+  -------****Trash Configuration***-----
+
+  cd /usr/local/hadoop/etc/hadoop
+
+  nano core-site.xml 
+
+  <property>
+  <name>fs.trash.interval</name>
+  <value>30</value>
+  <description>Number of minutes between trash checkpoints.If zero, the trash feature is disabled</description>
+  </property>
+
+  cd
+
+  hdfs dfs -rm <file>
+
+  hdfs dfs -ls -R <path.
+
+  ###To permanently Delete#####
+
+  hdfs dfs -rm -skipTrash <path-to-file.
+
+  *******Disk usage commonds******
+  hdfs dfs -du hdfs:/
+
+  hdfs dfs -du -h hdfs:/
+  for human readable format
+
+  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+  To find  Hadoop version
+
+  hadoop version
+  zookeeper version
+
+
+ cd /usr/local/hadoop/etc/hadoop
+
+ nano core-site.xml 
+
+ <property>
+ <name>fs.s3.impl</name>
+ <value>org.apache.hadoop.fs.s3.S3FileSystem</value>
+ <description>The FileSystem for s3a: S3 uris.</description>
+ </property>
+
+
+ nano mapred-site.xml
+
+ <property>
+ <!-- Add to the classpath used when running an M/R job -->
+ <name>mapreduce.application.classpath</name>
+ <value>$HADOOP_MAPRED_HOME/hadoop/mapreduce/*,$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/lib*,$HADOOP_MAPRED_HOME/share/hadoop/tools/lib/*<value>
+ </property>
+
+ cd
+
+
+hdfs dfs -ls /user/hduser
+
+ hadoop distcp /user/hduser/hadoop-3.4.0.tar.gz s3a://<bucket-name>/
+
+
+ ----------****Changing The block size****--------
+
+ cd /usr/local/hadoop/etc/hadoop
+
+ nano hdfs-site.xml
+
+ <property>
+ <name>dfs.block.size</name>
+ <value>256m</value>
+ </property>
+ 
+cd
+
+nano abc <write something save it>
+hdfs dfs -put abc /user/hduser
+
+verify throw NN webui
+ WebUI 9870
+
+ ---------*****Setting Repilacation fot a dataset***-------
+
+ hdfs dfs -setrep -w 4 <file-name>
